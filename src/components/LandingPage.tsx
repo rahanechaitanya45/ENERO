@@ -194,7 +194,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Problem vs Solution Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="p-8 sm:p-12 rounded-3xl bg-slate-900 text-white relative overflow-hidden">
           
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -226,7 +226,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="pt-2">
                 <button
                   onClick={onStartWizard}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
                 >
                   <span>Build your home profile in 2 minutes</span>
                   <ArrowRight className="w-4 h-4" />
@@ -239,7 +239,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* How It Works Section (4 Steps) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
           <span className="text-xs font-bold uppercase tracking-wider text-cyan-600">
             How It Works
@@ -322,7 +323,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Feature Pillar Highlights */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
           <div className="p-6 rounded-2xl bg-white border border-slate-200/80 space-y-3">

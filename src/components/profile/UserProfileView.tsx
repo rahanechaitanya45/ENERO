@@ -1,0 +1,341 @@
+import React, { useState } from 'react';
+import { 
+  User, 
+  Mail, 
+  Home, 
+  Users, 
+  Wallet, 
+  Zap, 
+  ShieldCheck, 
+  LogOut, 
+  KeyRound, 
+  Edit3, 
+  Check, 
+  ArrowLeft,
+  Building,
+  RotateCcw
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { HomeType, TariffConfig } from '../../types';
+
+interface UserProfileViewProps {
+  tariff: TariffConfig;
+  onOpenChangePassword: () => void;
+  onNavigateToDashboard: () => void;
+  onClearUserData: () => void;
+}
+
+export const UserProfileView: React.FC<UserProfileViewProps> = ({
+  tariff,
+  onOpenChangePassword,
+  onNavigateToDashboard,
+  onClearUserData,
+}) => {
+  const { user, profile, updateProfile, signOut, isDemoMode, isLiveMode } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Edit form state
+  const [fullName, setFullName] = useState(profile?.fullName || '');
+  const [homeType, setHomeType] = useState<HomeType>(profile?.homeType || 'Apartment');
+  const [occupants, setOccupants] = useState<number>(profile?.occupants || 3);
+  const [provider, setProvider] = useState(profile?.electricityProvider || 'Tata Power');
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(profile?.monthlyBudget || 2500);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Derive initials
+  const initials = (profile?.fullName || user?.email || 'EN')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateProfile({
+      fullName: fullName.trim(),
+      homeType,
+      occupants: Number(occupants),
+      electricityProvider: provider.trim(),
+      monthlyBudget: Number(monthlyBudget),
+    });
+    setIsEditing(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const homeTypeChoices: HomeType[] = [
+    'Apartment',
+    'Independent House',
+    'Hostel/PG',
+    'Small Office',
+    'Other',
+  ];
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+      
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onNavigateToDashboard}
+            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              User Profile
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage your personal details, household parameters, and security credentials
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!isEditing && (
+            <button
+              onClick={() => {
+                setFullName(profile?.fullName || '');
+                setHomeType(profile?.homeType || 'Apartment');
+                setOccupants(profile?.occupants || 3);
+                setProvider(profile?.electricityProvider || '');
+                setMonthlyBudget(profile?.monthlyBudget || 2500);
+                setIsEditing(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit Profile</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenChangePassword}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+            <span>Change Password</span>
+          </button>
+
+          <button
+            onClick={signOut}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/80 rounded-xl transition-colors shadow-2xs cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Log Out</span>
+          </button>
+        </div>
+      </div>
+
+      {saveSuccess && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150">
+          <Check className="w-4 h-4 text-emerald-600" />
+          <span>Profile changes saved successfully!</span>
+        </div>
+      )}
+
+      {/* Main Profile Info Card */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+        
+        {/* User Identity Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-slate-100 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 to-sky-400 text-white font-black text-xl flex items-center justify-center shadow-md shadow-cyan-500/20">
+              {initials}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-slate-900">
+                  {profile?.fullName || 'ENERO Member'}
+                </h2>
+                {isDemoMode && (
+                  <span className="text-[10px] font-semibold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full">
+                    Demo Account
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 font-mono">
+                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                <span>{user?.email || profile?.email || 'vedant@example.com'}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start sm:items-end text-xs text-slate-400">
+            <span className="font-mono text-[11px]">User ID: {user?.id?.substring(0, 14)}...</span>
+            <span className="text-[11px] mt-0.5">
+              Security: {isLiveMode ? 'Supabase PostgreSQL RLS' : 'Isolated User Store'}
+            </span>
+          </div>
+        </div>
+
+        {/* Profile Details or Edit Form */}
+        {isEditing ? (
+          <form onSubmit={handleSaveProfile} className="space-y-5 animate-in fade-in duration-150">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Home Type
+                </label>
+                <select
+                  value={homeType}
+                  onChange={(e) => setHomeType(e.target.value as HomeType)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-cyan-500"
+                >
+                  {homeTypeChoices.map((ht) => (
+                    <option key={ht} value={ht}>{ht}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Number of People
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={occupants}
+                  onChange={(e) => setOccupants(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Electricity Provider
+                </label>
+                <input
+                  type="text"
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Monthly Target Electricity Budget ({tariff.currency})
+                </label>
+                <input
+                  type="number"
+                  step="50"
+                  min="100"
+                  value={monthlyBudget}
+                  onChange={(e) => setMonthlyBudget(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-cyan-500"
+                />
+              </div>
+
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Save Profile
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* Profile Parameters Grid (Prompt Section 8) */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Home Type
+              </span>
+              <div className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <Home className="w-4 h-4 text-cyan-600" />
+                <span>{profile?.homeType || 'Apartment'}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Occupants
+              </span>
+              <div className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-cyan-600" />
+                <span>{profile?.occupants || 4} {profile?.occupants === 1 ? 'person' : 'people'}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Monthly Target Budget
+              </span>
+              <div className="text-base font-bold font-mono text-cyan-900 flex items-center gap-1">
+                <Wallet className="w-4 h-4 text-cyan-600" />
+                <span>{tariff.currency}{(profile?.monthlyBudget || 2500).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Electricity Provider
+              </span>
+              <div className="text-base font-bold text-slate-900 truncate flex items-center gap-1.5" title={profile?.electricityProvider}>
+                <Building className="w-4 h-4 text-cyan-600 shrink-0" />
+                <span className="truncate">{profile?.electricityProvider || 'Tata Power'}</span>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* Security & Row Level Security Banner */}
+      <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-3">
+        <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-wider">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Security & Data Isolation</span>
+        </div>
+        <h3 className="text-lg font-bold text-white">
+          Your Appliances and Electricity Calculations are Private
+        </h3>
+        <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">
+          ENERO uses strict Row Level Security (RLS) policies. Every appliance, simulation, and history snapshot is tied exclusively to your authenticated user account. User A cannot query User B's equipment under any circumstance.
+        </p>
+
+        <div className="pt-2 flex items-center gap-4 text-xs">
+          <button
+            onClick={onClearUserData}
+            className="text-rose-400 hover:text-rose-300 font-medium underline cursor-pointer"
+          >
+            Clear my saved appliances & history
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+};

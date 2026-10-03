@@ -13,8 +13,10 @@ import {
   Sparkles,
   PieChart as PieChartIcon,
   Printer,
-  ChevronRight
+  ChevronRight,
+  Plus
 } from 'lucide-react';
+
 import { 
   PieChart, 
   Pie, 
@@ -33,7 +35,10 @@ interface EnergyDashboardProps {
   homeProfile: HomeProfile;
   onNavigateTab: (tab: string) => void;
   onOpenTariffModal: () => void;
+  onAddAppliance?: () => void;
+  onLoadDemo?: () => void;
 }
+
 
 const DONUT_COLORS = [
   '#0284c7', // Sky / Cyan
@@ -53,7 +58,10 @@ export const EnergyDashboard: React.FC<EnergyDashboardProps> = ({
   homeProfile,
   onNavigateTab,
   onOpenTariffModal,
+  onAddAppliance,
+  onLoadDemo,
 }) => {
+
   const [viewMode, setViewMode] = useState<'monthly' | 'daily'>('monthly');
 
   // Prepare chart data for top 5 appliances + "Others"
@@ -163,8 +171,46 @@ export const EnergyDashboard: React.FC<EnergyDashboardProps> = ({
         </div>
       </div>
 
+      {/* First-Time User Empty State (Prompt Section 18) */}
+      {rankedAppliances.length === 0 && (
+
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center space-y-5 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-50 border border-cyan-200/80 text-cyan-600 flex items-center justify-center mx-auto shadow-sm">
+            <Zap className="w-8 h-8 fill-cyan-600" />
+          </div>
+          <div className="space-y-2 max-w-md mx-auto">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Let's calculate your electricity usage ⚡
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              You haven't added any appliances yet. Add your air conditioner, fans, refrigerator, or lighting to calculate your first estimated electricity bill.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            {onAddAppliance && (
+              <button
+                onClick={onAddAppliance}
+                className="px-6 py-3 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-md shadow-slate-900/10 active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add Your First Appliance</span>
+              </button>
+            )}
+            {onLoadDemo && (
+              <button
+                onClick={onLoadDemo}
+                className="px-5 py-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Load Common Home Essentials
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* TOP 4 KEY METRIC CARDS (Prompt Section 16) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
         
         {/* Card 1: Estimated Monthly / Daily Usage */}
         <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between space-y-3">

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navbar } from './components/Navbar';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { LandingPage } from './components/LandingPage';
@@ -20,11 +21,21 @@ import { AboutModal } from './components/AboutModal';
 import { Footer } from './components/Footer';
 import { MobileNavigation } from './components/MobileNavigation';
 
+// Auth & Profile Components
+import { LoginPage } from './components/auth/LoginPage';
+import { SignUpPage } from './components/auth/SignUpPage';
+import { EmailVerificationNotice } from './components/auth/EmailVerificationNotice';
+import { ForgotPasswordModal } from './components/auth/ForgotPasswordModal';
+import { UserOnboardingWizard } from './components/auth/UserOnboardingWizard';
+import { UserProfileView } from './components/profile/UserProfileView';
+import { ChangePasswordModal } from './components/profile/ChangePasswordModal';
+
 import { 
   Appliance, 
   TariffConfig, 
   HomeProfile, 
-  HistorySnapshot 
+  HistorySnapshot, 
+  HomeType 
 } from './types';
 import { 
   calculateTotalSummary, 
@@ -32,16 +43,38 @@ import {
 } from './services/calculationService';
 import { storageService } from './services/storageService';
 import { DEFAULT_APPLIANCES } from './data/defaultData';
+import { Zap, Loader2 } from 'lucide-react';
 
-export default function App() {
+function EneroAppContent() {
+  const { 
+    user, 
+    profile, 
+    loading: authLoading, 
+    unverifiedEmail, 
+    clearUnverifiedEmail,
+    isDemoMode,
+    signOut
+  } = useAuth();
+
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>('landing');
 
-  // Persistent Domain States
-  const [appliances, setAppliances] = useState<Appliance[]>(() => storageService.getAppliances());
-  const [tariff, setTariff] = useState<TariffConfig>(() => storageService.getTariff());
-  const [homeProfile, setHomeProfile] = useState<HomeProfile>(() => storageService.getHomeProfile());
-  const [history, setHistory] = useState<HistorySnapshot[]>(() => storageService.getHistory());
+  // User-scoped data identifier
+  const currentUserId = user ? user.id : 'guest';
+
+  // Persistent Domain States - Scoped strictly to current user ID
+  const [appliances, setAppliances] = useState<Appliance[]>(() => 
+    storageService.getAppliances(currentUserId)
+  );
+  const [tariff, setTariff] = useState<TariffConfig>(() => 
+    storageService.getTariff(currentUserId)
+  );
+  const [homeProfile, setHomeProfile] = useState<HomeProfile>(() => 
+    storageService.getHomeProfile(currentUserId)
+  );
+  const [history, setHistory] = useState<HistorySnapshot[]>(() => 
+    storageService.getHistory(currentUserId)
+  );
 
   // Modal Dialog States
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -49,26 +82,64 @@ export default function App() {
   const [editingAppliance, setEditingAppliance] = useState<Appliance | null>(null);
   const [isTariffModalOpen, setIsTariffModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Cross-view linking
   const [simulationTargetId, setSimulationTargetId] = useState<string | null>(null);
 
-  // Sync to local storage whenever state changes
+  // Reload user data whenever logged-in user changes (Strict Row-Level Isolation)
   useEffect(() => {
-    storageService.saveAppliances(appliances);
-  }, [appliances]);
+    if (!authLoading) {
+      const uId = user ? user.id : 'guest';
+      setAppliances(storageService.getAppliances(uId));
+      setTariff(storageService.getTariff(uId));
+      setHomeProfile(storageService.getHomeProfile(uId));
+      setHistory(storageService.getHistory(uId));
+    }
+  }, [user?.id, authLoading]);
+
+  // Sync to user-scoped storage whenever state changes
+  useEffect(() => {
+    if (!authLoading) {
+      storageService.saveAppliances(appliances, currentUserId);
+    }
+  }, [appliances, currentUserId, authLoading]);
 
   useEffect(() => {
-    storageService.saveTariff(tariff);
-  }, [tariff]);
+    if (!authLoading) {
+      storageService.saveTariff(tariff, currentUserId);
+    }
+  }, [tariff, currentUserId, authLoading]);
 
   useEffect(() => {
-    storageService.saveHomeProfile(homeProfile);
-  }, [homeProfile]);
+    if (!authLoading) {
+      storageService.saveHomeProfile(homeProfile, currentUserId);
+    }
+  }, [homeProfile, currentUserId, authLoading]);
 
   useEffect(() => {
-    storageService.saveHistory(history);
-  }, [history]);
+    if (!authLoading) {
+      storageService.saveHistory(history, currentUserId);
+    }
+  }, [history, currentUserId, authLoading]);
+
+  // Protected route enforcement (Section 6 & 16)
+  const protectedTabs = [
+    'dashboard', 
+    'appliances', 
+    'analysis', 
+    'simulator', 
+    'recommendations', 
+    'history', 
+    'profile'
+  ];
+
+  useEffect(() => {
+    if (!authLoading && !user && protectedTabs.includes(activeTab)) {
+      setActiveTab('login');
+    }
+  }, [user, activeTab, authLoading]);
 
   // Central Calculation Engine
   const { summary, rankedAppliances } = useMemo(() => {
@@ -81,6 +152,10 @@ export default function App() {
 
   // Appliance CRUD Handlers
   const handleOpenAddAppliance = () => {
+    if (!user) {
+      setActiveTab('login');
+      return;
+    }
     setEditingAppliance(null);
     setIsApplianceModalOpen(true);
   };
@@ -165,16 +240,116 @@ export default function App() {
   };
 
   const handleResetDemoData = () => {
-    const reset = storageService.resetToDemo();
+    const reset = storageService.resetToDemo(currentUserId);
     setAppliances(reset.appliances);
     setTariff(reset.tariff);
     setHomeProfile(reset.homeProfile);
     setHistory(reset.history);
   };
 
+  const handleClearUserData = () => {
+    const cleared = storageService.clearAllUserData(currentUserId);
+    setAppliances(cleared.appliances);
+    setHistory(cleared.history);
+  };
+
   const handlePopulateStarterAppliances = (newAppliances: Appliance[]) => {
     setAppliances(newAppliances);
   };
+
+  const handleSaveProfileAndTariffFromOnboarding = (
+    homeType: HomeType,
+    occupants: number,
+    provider: string,
+    tariffRate: number,
+    budget: number
+  ) => {
+    setHomeProfile({
+      homeType,
+      occupants,
+      provider,
+      targetMonthlyBudget: budget,
+    });
+    setTariff((prev) => ({
+      ...prev,
+      flatRate: tariffRate,
+      providerName: provider,
+    }));
+  };
+
+  // Loading Screen (Section 11 & 15)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-900 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-sky-400 text-white flex items-center justify-center shadow-lg shadow-cyan-500/25 animate-pulse">
+          <Zap className="w-7 h-7 fill-white" />
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="text-base font-bold text-slate-900 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-cyan-600" />
+            <span>Loading your energy data...</span>
+          </h2>
+          <p className="text-xs text-slate-500 font-mono">Restoring secure session</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Email verification required screen (Section 4)
+  if (unverifiedEmail) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+        <DisclaimerBanner />
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onAddAppliance={handleOpenAddAppliance}
+          onOpenTariffModal={() => setIsTariffModalOpen(true)}
+          onOpenAboutModal={() => setIsAboutModalOpen(true)}
+          onResetDemo={handleResetDemoData}
+          tariff={tariff}
+          totalApplianceCount={appliances.length}
+        />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <EmailVerificationNotice
+            email={unverifiedEmail}
+            onVerifiedContinue={() => {
+              clearUnverifiedEmail();
+              setActiveTab('onboarding');
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // First-time Onboarding flow (Section 7)
+  if (user && profile && !profile.hasCompletedOnboarding && activeTab === 'onboarding') {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+        <DisclaimerBanner />
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onAddAppliance={handleOpenAddAppliance}
+          onOpenTariffModal={() => setIsTariffModalOpen(true)}
+          onOpenAboutModal={() => setIsAboutModalOpen(true)}
+          onResetDemo={handleResetDemoData}
+          tariff={tariff}
+          totalApplianceCount={appliances.length}
+        />
+        <main className="flex-1">
+          <UserOnboardingWizard
+            userName={profile.fullName}
+            tariff={tariff}
+            onSaveProfileAndTariff={handleSaveProfileAndTariffFromOnboarding}
+            onAddInitialAppliances={handlePopulateStarterAppliances}
+            onComplete={() => setActiveTab('dashboard')}
+          />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
@@ -197,15 +372,57 @@ export default function App() {
       {/* Content View Router */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20">
         
+        {/* PUBLIC ROUTE: Landing Page */}
         {activeTab === 'landing' && (
           <LandingPage
-            onStartWizard={() => setIsWizardOpen(true)}
-            onExploreDashboard={() => setActiveTab('dashboard')}
+            onStartWizard={() => {
+              if (user) {
+                setIsWizardOpen(true);
+              } else {
+                setActiveTab('signup');
+              }
+            }}
+            onExploreDashboard={() => {
+              if (user) {
+                setActiveTab('dashboard');
+              } else {
+                setActiveTab('login');
+              }
+            }}
             summary={summary}
             tariff={tariff}
           />
         )}
 
+        {/* AUTH ROUTE: Login */}
+        {activeTab === 'login' && (
+          <LoginPage
+            onNavigateToSignUp={() => setActiveTab('signup')}
+            onNavigateToForgotPassword={() => setIsForgotPasswordOpen(true)}
+            onSuccess={() => {
+              if (profile && !profile.hasCompletedOnboarding) {
+                setActiveTab('onboarding');
+              } else {
+                setActiveTab('dashboard');
+              }
+            }}
+          />
+        )}
+
+        {/* AUTH ROUTE: Sign Up */}
+        {activeTab === 'signup' && (
+          <SignUpPage
+            onNavigateToLogin={() => setActiveTab('login')}
+            onSuccessVerificationRequired={() => {
+              // handled automatically by unverifiedEmail state
+            }}
+            onSuccessImmediate={() => {
+              setActiveTab('onboarding');
+            }}
+          />
+        )}
+
+        {/* PROTECTED ROUTE: Dashboard 🔐 */}
         {activeTab === 'dashboard' && (
           <EnergyDashboard
             summary={summary}
@@ -214,9 +431,12 @@ export default function App() {
             homeProfile={homeProfile}
             onNavigateTab={setActiveTab}
             onOpenTariffModal={() => setIsTariffModalOpen(true)}
+            onAddAppliance={handleOpenAddAppliance}
+            onLoadDemo={handleResetDemoData}
           />
         )}
 
+        {/* PROTECTED ROUTE: Appliances 🔐 */}
         {activeTab === 'appliances' && (
           <ApplianceList
             appliances={rankedAppliances}
@@ -229,6 +449,7 @@ export default function App() {
           />
         )}
 
+        {/* PROTECTED ROUTE: Analysis / Biggest Consumers 🔐 */}
         {activeTab === 'analysis' && (
           <ApplianceAnalysis
             rankedAppliances={rankedAppliances}
@@ -238,6 +459,7 @@ export default function App() {
           />
         )}
 
+        {/* PROTECTED ROUTE: Savings Simulator 🔐 */}
         {activeTab === 'simulator' && (
           <SavingsSimulator
             appliances={appliances}
@@ -249,6 +471,7 @@ export default function App() {
           />
         )}
 
+        {/* PROTECTED ROUTE: Recommendations Plan 🔐 */}
         {activeTab === 'recommendations' && (
           <RecommendationsPlan
             insights={smartInsights}
@@ -260,6 +483,7 @@ export default function App() {
           />
         )}
 
+        {/* PROTECTED ROUTE: History 🔐 */}
         {activeTab === 'history' && (
           <EnergyHistoryView
             history={history}
@@ -268,6 +492,16 @@ export default function App() {
             onSaveCurrentAsSnapshot={handleSaveCurrentAsSnapshot}
             onDeleteSnapshot={handleDeleteSnapshot}
             onResetHistory={handleResetDemoData}
+          />
+        )}
+
+        {/* PROTECTED ROUTE: Profile 🔐 */}
+        {activeTab === 'profile' && (
+          <UserProfileView
+            tariff={tariff}
+            onOpenChangePassword={() => setIsChangePasswordOpen(true)}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
+            onClearUserData={handleClearUserData}
           />
         )}
 
@@ -309,20 +543,57 @@ export default function App() {
         onClose={() => setIsAboutModalOpen(false)}
       />
 
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+        onNavigateToLogin={() => setActiveTab('login')}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
+
       {/* Footer */}
       <Footer
-        onNavigateTab={setActiveTab}
+        onNavigateTab={(tab) => {
+          if (!user && protectedTabs.includes(tab)) {
+            setActiveTab('login');
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         onOpenAboutModal={() => setIsAboutModalOpen(true)}
-        onOpenTariffModal={() => setIsTariffModalOpen(true)}
+        onOpenTariffModal={() => {
+          if (!user) {
+            setActiveTab('login');
+          } else {
+            setIsTariffModalOpen(true);
+          }
+        }}
       />
 
       {/* Mobile Bottom Navigation */}
       <MobileNavigation
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          if (!user && protectedTabs.includes(tab)) {
+            setActiveTab('login');
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         applianceCount={appliances.length}
       />
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <EneroAppContent />
+    </AuthProvider>
   );
 }
