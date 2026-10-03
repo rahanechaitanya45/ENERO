@@ -1,0 +1,7 @@
+{
+  "name": "ENERO — Smart Electricity Bill Estimator & Savings Assistant",
+  "description": "Estimate your electricity bill, understand which appliances consume the most energy, and discover practical ways to reduce your monthly electricity expenses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
