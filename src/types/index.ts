@@ -131,3 +131,20 @@ export interface PaymentRecord {
   paymentMethod: string;
 }
 
+export interface UserProfile {
+  id: string;
+  userId: string; // Firebase UID
+  fullName: string;
+  email: string;
+  homeType: HomeType;
+  occupants: number;
+  electricityProvider: string;
+  tariffRate: number;
+  monthlyBudget: number;
+  hasCompletedOnboarding: boolean;
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+

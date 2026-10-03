@@ -66,10 +66,10 @@ function EneroAppContent() {
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>('landing');
 
-  // User-scoped data identifier
-  const currentUserId = user ? user.id : 'guest';
+  // User-scoped data identifier: Firebase UID as unique ID (Section 10)
+  const currentUserId = user ? user.uid : 'guest';
 
-  // Persistent Domain States - Scoped strictly to current user ID
+  // Persistent Domain States - Scoped strictly to current Firebase UID
   const [appliances, setAppliances] = useState<Appliance[]>(() => 
     storageService.getAppliances(currentUserId)
   );
@@ -99,17 +99,17 @@ function EneroAppContent() {
   // Cross-view linking
   const [simulationTargetId, setSimulationTargetId] = useState<string | null>(null);
 
-  // Reload user data whenever logged-in user changes (Strict Row-Level Isolation)
+  // Reload user data whenever logged-in user changes (Strict Row-Level Isolation by Firebase UID)
   useEffect(() => {
     if (!authLoading) {
-      const uId = user ? user.id : 'guest';
+      const uId = user ? user.uid : 'guest';
       setAppliances(storageService.getAppliances(uId));
       setTariff(storageService.getTariff(uId));
       setHomeProfile(storageService.getHomeProfile(uId));
       setHistory(storageService.getHistory(uId));
       setSubscription(subscriptionService.getSubscription(uId));
     }
-  }, [user?.id, authLoading]);
+  }, [user?.uid, authLoading]);
 
   // Sync to user-scoped storage whenever state changes
   useEffect(() => {

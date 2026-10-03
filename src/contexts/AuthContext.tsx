@@ -1,18 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Session } from '@supabase/supabase-js';
 import { 
-  supabase, 
-  isLiveSupabaseConfigured, 
-  UserProfile, 
-  localAuthService, 
-  LocalUser 
-} from '../services/supabaseClient';
+  User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  onAuthStateChanged,
+  updateProfile as firebaseUpdateProfile,
+  updatePassword as firebaseUpdatePassword,
+  signInWithPopup,
+  GoogleAuthProvider
+} from 'firebase/auth';
+import { auth } from '../lib/firebase';
+import { UserProfile } from '../types';
+import { profileService } from '../services/profileService';
+
+export interface ExtendedUser extends FirebaseUser {
+  id: string; // Alias for uid for backward compatibility with existing ENERO components
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: ExtendedUser | null;
   profile: UserProfile | null;
-  session: Session | null;
+  session: any | null;
   loading: boolean;
+  isAuthenticated: boolean;
   isLiveMode: boolean;
   isDemoMode: boolean;
   unverifiedEmail: string | null;
@@ -31,119 +44,106 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function formatFirebaseError(error: any): string {
+  if (!error) return 'An unexpected error occurred. Please try again.';
+  const code = error.code || '';
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. Please log in.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Incorrect email or password.';
+    case 'auth/weak-password':
+      return 'Please choose a stronger password.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please try again later.';
+    case 'auth/user-disabled':
+      return 'This user account has been disabled.';
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in was cancelled.';
+    case 'auth/network-request-failed':
+      return 'Network connection issue. Please check your internet connection.';
+    default:
+      return error.message && !error.message.includes('Firebase:')
+        ? error.message
+        : 'Authentication failed. Please verify your details and try again.';
+  }
+}
+
+function adaptFirebaseUser(user: FirebaseUser | null): ExtendedUser | null {
+  if (!user) return null;
+  const extended = user as ExtendedUser;
+  // Ensure .id matches .uid for legacy callers
+  if (!extended.id) {
+    Object.defineProperty(extended, 'id', {
+      value: user.uid,
+      writable: true,
+      enumerable: true,
+    });
+  }
+  return extended;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
-  // Restore session on mount
+  // Central Firebase Authentication Listener (onAuthStateChanged)
   useEffect(() => {
-    async function restoreSession() {
-      setLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const extUser = adaptFirebaseUser(firebaseUser);
+        setUser(extUser);
+        setIsDemoMode(false);
 
-      if (isLiveSupabaseConfigured && supabase) {
-        try {
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          if (currentSession && currentSession.user) {
-            setSession(currentSession);
-            setUser(currentSession.user);
-            await fetchSupabaseProfile(currentSession.user.id, currentSession.user.email || '');
-          }
-        } catch (err) {
-          console.warn('Error fetching Supabase session:', err);
+        // Fetch or create user profile associated with Firebase UID
+        const userProf = profileService.getProfile(
+          firebaseUser.uid,
+          firebaseUser.email || '',
+          firebaseUser.displayName || ''
+        );
+        setProfile(userProf);
+
+        // Check verification status
+        if (!firebaseUser.emailVerified && firebaseUser.email) {
+          // If signed up via email/password and unverified
+          // Note: OAuth providers typically have emailVerified = true
+          // Keep unverifiedEmail if needed or let existing session flow continue
         }
-
-        // Listen to auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-          setSession(newSession);
-          if (newSession && newSession.user) {
-            setUser(newSession.user);
-            await fetchSupabaseProfile(newSession.user.id, newSession.user.email || '');
-          } else {
-            setUser(null);
-            setProfile(null);
-          }
-        });
-
-        setLoading(false);
-        return () => subscription.unsubscribe();
       } else {
-        // Fallback / local storage session restoration
-        const localSession = localAuthService.getCurrentSession();
-        if (localSession) {
-          setUser(localSession.user);
-          setProfile(localSession.profile);
-          setIsDemoMode(localSession.user.id === 'demo-user-vedant');
+        // Check if demo user session exists
+        const demoSessionKey = localStorage.getItem('enero_demo_session_active');
+        if (demoSessionKey === 'true') {
+          const demoProfile = profileService.getProfile('demo-user-vedant');
+          const mockUser = {
+            uid: 'demo-user-vedant',
+            id: 'demo-user-vedant',
+            email: 'vedant@example.com',
+            displayName: 'Vedant Deshmukh',
+            emailVerified: true,
+          } as unknown as ExtendedUser;
+          setUser(mockUser);
+          setProfile(demoProfile);
+          setIsDemoMode(true);
+        } else {
+          setUser(null);
+          setProfile(null);
+          setIsDemoMode(false);
         }
-        setLoading(false);
       }
-    }
+      setLoading(false);
+    });
 
-    restoreSession();
+    return () => unsubscribe();
   }, []);
 
-  // Helper to fetch or create user profile from Supabase database
-  const fetchSupabaseProfile = async (userId: string, email: string) => {
-    if (!supabase) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (data && !error) {
-        setProfile({
-          id: data.id,
-          userId: data.user_id,
-          fullName: data.full_name || email.split('@')[0],
-          email,
-          homeType: data.home_type || 'Apartment',
-          occupants: data.people_count || 3,
-          electricityProvider: data.electricity_provider || 'Generic Utility',
-          tariffRate: Number(data.tariff_rate) || 7.5,
-          monthlyBudget: Number(data.monthly_budget) || 2500,
-          hasCompletedOnboarding: true,
-          createdAt: data.created_at,
-          updatedAt: data.updated_at,
-        });
-      } else {
-        // Create initial profile if missing
-        const newProf: UserProfile = {
-          id: userId,
-          userId,
-          fullName: email.split('@')[0],
-          email,
-          homeType: 'Apartment',
-          occupants: 3,
-          electricityProvider: 'Generic Utility',
-          tariffRate: 7.5,
-          monthlyBudget: 2500,
-          hasCompletedOnboarding: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await supabase.from('profiles').insert({
-          id: userId,
-          user_id: userId,
-          full_name: newProf.fullName,
-          home_type: newProf.homeType,
-          people_count: newProf.occupants,
-          electricity_provider: newProf.electricityProvider,
-          tariff_rate: newProf.tariffRate,
-          monthly_budget: newProf.monthlyBudget,
-        });
-        setProfile(newProf);
-      }
-    } catch (err) {
-      console.error('Error fetching Supabase profile:', err);
-    }
-  };
-
-  // Sign Up
+  // Sign Up with Firebase Authentication
   const signUp = async (email: string, password: string, fullName: string) => {
     // 1. Password policy validation: min 8 chars, 1 number, 1 uppercase
     if (password.length < 8) {
@@ -156,235 +156,132 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Password must contain at least one uppercase letter.' };
     }
 
-    if (isLiveSupabaseConfigured && supabase) {
+    try {
+      // 1. Create Firebase user
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const createdUser = userCredential.user;
+
+      // 2. Set display name in Firebase profile
       try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-          },
+        await firebaseUpdateProfile(createdUser, {
+          displayName: fullName.trim(),
         });
-
-        if (error) {
-          if (error.message.includes('already registered')) {
-            return { success: false, error: 'An account with this email already exists. Try signing in instead.' };
-          }
-          return { success: false, error: error.message };
-        }
-
-        if (data.user && !data.session) {
-          setUnverifiedEmail(email);
-          return { success: true, requiresVerification: true };
-        }
-
-        return { success: true, requiresVerification: false };
       } catch (err) {
-        return { success: false, error: "We couldn't connect to ENERO. Please check your connection and try again." };
-      }
-    } else {
-      // Local Auth Provider
-      const users = localAuthService.getUsers();
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-        return { success: false, error: 'An account with this email already exists. Try signing in instead.' };
+        console.warn('Could not update Firebase displayName:', err);
       }
 
-      const newUserId = `user-${Date.now()}`;
-      const newProfile: UserProfile = {
-        id: newUserId,
-        userId: newUserId,
-        fullName: fullName.trim(),
-        email: email.trim(),
-        homeType: 'Apartment',
-        occupants: 3,
-        electricityProvider: 'Generic Grid Provider',
-        tariffRate: 7.50,
-        monthlyBudget: 2500,
-        hasCompletedOnboarding: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // 3. Send email verification
+      try {
+        await sendEmailVerification(createdUser);
+      } catch (err) {
+        console.warn('Could not send verification email:', err);
+      }
 
-      const newLocalUser: LocalUser = {
-        id: newUserId,
-        email: email.trim(),
-        fullName: fullName.trim(),
-        passwordHash: password,
-        isEmailVerified: false,
-        profile: newProfile,
-      };
+      // 4. Create the user's ENERO profile associated with Firebase UID
+      const newProfile = profileService.getProfile(createdUser.uid, email.trim(), fullName.trim());
+      newProfile.fullName = fullName.trim();
+      profileService.saveProfile(newProfile);
 
-      localAuthService.saveUsers([...users, newLocalUser]);
-      setUnverifiedEmail(email);
+      setProfile(newProfile);
+      setUnverifiedEmail(email.trim());
+
       return { success: true, requiresVerification: true };
+    } catch (err: any) {
+      return { success: false, error: formatFirebaseError(err) };
     }
   };
 
-  // Sign In
+  // Sign In with Firebase Authentication
   const signIn = async (email: string, password: string) => {
-    if (isLiveSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+    try {
+      localStorage.removeItem('enero_demo_session_active');
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const signedInUser = userCredential.user;
 
-        if (error) {
-          if (error.message.includes('Email not confirmed')) {
-            setUnverifiedEmail(email);
-            return { success: false, error: 'Please verify your email before continuing.' };
-          }
-          return { success: false, error: 'Email or password is incorrect. Please try again.' };
-        }
-
-        setUser(data.user);
-        setSession(data.session);
-        setIsDemoMode(false);
-        await fetchSupabaseProfile(data.user.id, data.user.email || '');
-        return { success: true };
-      } catch {
-        return { success: false, error: "We couldn't connect to ENERO. Please check your connection and try again." };
-      }
-    } else {
-      // Local Auth Provider
-      const users = localAuthService.getUsers();
-      const matchedUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-
-      if (!matchedUser || matchedUser.passwordHash !== password) {
-        return { success: false, error: 'Email or password is incorrect. Please try again.' };
-      }
-
-      if (!matchedUser.isEmailVerified) {
-        setUnverifiedEmail(email);
-        return { success: false, error: 'Please verify your email before continuing.' };
-      }
-
-      const mockUser = {
-        id: matchedUser.id,
-        email: matchedUser.email,
-        app_metadata: {},
-        user_metadata: { full_name: matchedUser.fullName },
-        aud: 'authenticated',
-        created_at: matchedUser.profile.createdAt,
-      } as User;
-
-      setUser(mockUser);
-      setProfile(matchedUser.profile);
-      setIsDemoMode(matchedUser.id === 'demo-user-vedant');
-      localAuthService.saveCurrentSession({ user: mockUser, profile: matchedUser.profile });
-      return { success: true };
-    }
-  };
-
-  // Sign In with Google
-  const signInWithGoogle = async () => {
-    if (isLiveSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin,
-          },
-        });
-        if (error) return { success: false, error: error.message };
-        return { success: true };
-      } catch {
-        return { success: false, error: "We couldn't connect to Google sign-in. Try again." };
-      }
-    } else {
-      // Demo Google Sign-In
-      const googleUser = {
-        id: 'google-user-sample',
-        email: 'alex.energy@gmail.com',
-        app_metadata: {},
-        user_metadata: { full_name: 'Alex Rivera' },
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-      } as User;
-
-      const googleProfile: UserProfile = {
-        id: 'google-user-sample',
-        userId: 'google-user-sample',
-        fullName: 'Alex Rivera',
-        email: 'alex.energy@gmail.com',
-        homeType: 'Apartment',
-        occupants: 2,
-        electricityProvider: 'Tata Power',
-        tariffRate: 7.5,
-        monthlyBudget: 2200,
-        hasCompletedOnboarding: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setUser(googleUser);
-      setProfile(googleProfile);
+      const extUser = adaptFirebaseUser(signedInUser);
+      setUser(extUser);
       setIsDemoMode(false);
-      localAuthService.saveCurrentSession({ user: googleUser, profile: googleProfile });
+
+      const userProf = profileService.getProfile(
+        signedInUser.uid,
+        signedInUser.email || '',
+        signedInUser.displayName || ''
+      );
+      setProfile(userProf);
+
       return { success: true };
+    } catch (err: any) {
+      return { success: false, error: formatFirebaseError(err) };
     }
   };
 
-  // Demo Mode Account ("Vedant" from spec Section 8 & 19)
+  // Sign In with Google OAuth via Firebase
+  const signInWithGoogle = async () => {
+    try {
+      localStorage.removeItem('enero_demo_session_active');
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const googleUser = userCredential.user;
+
+      const extUser = adaptFirebaseUser(googleUser);
+      setUser(extUser);
+      setIsDemoMode(false);
+
+      const userProf = profileService.getProfile(
+        googleUser.uid,
+        googleUser.email || '',
+        googleUser.displayName || 'Google User'
+      );
+      setProfile(userProf);
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: formatFirebaseError(err) };
+    }
+  };
+
+  // Demo Account ("Vedant Deshmukh" preview)
   const signInWithDemo = async () => {
-    const demoUser = {
+    localStorage.setItem('enero_demo_session_active', 'true');
+    const demoProfile = profileService.getProfile('demo-user-vedant');
+    const mockUser = {
+      uid: 'demo-user-vedant',
       id: 'demo-user-vedant',
       email: 'vedant@example.com',
-      app_metadata: {},
-      user_metadata: { full_name: 'Vedant Deshmukh' },
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00.000Z',
-    } as User;
+      displayName: 'Vedant Deshmukh',
+      emailVerified: true,
+    } as unknown as ExtendedUser;
 
-    const demoProfile: UserProfile = {
-      id: 'demo-user-vedant',
-      userId: 'demo-user-vedant',
-      fullName: 'Vedant Deshmukh',
-      email: 'vedant@example.com',
-      homeType: 'Apartment',
-      occupants: 4,
-      electricityProvider: 'Tata Power Residential',
-      tariffRate: 7.50,
-      monthlyBudget: 2500,
-      hasCompletedOnboarding: true,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      updatedAt: '2026-10-01T00:00:00.000Z',
-    };
-
-    setUser(demoUser);
+    setUser(mockUser);
     setProfile(demoProfile);
     setIsDemoMode(true);
-    localAuthService.saveCurrentSession({ user: demoUser, profile: demoProfile });
   };
 
-  // Sign Out
+  // Sign Out with Firebase Authentication
   const signOut = async () => {
-    if (isLiveSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    try {
+      localStorage.removeItem('enero_demo_session_active');
+      await firebaseSignOut(auth);
+    } catch (err) {
+      console.warn('Firebase sign-out error:', err);
     }
-    localAuthService.saveCurrentSession(null);
     setUser(null);
     setProfile(null);
-    setSession(null);
     setIsDemoMode(false);
     setUnverifiedEmail(null);
   };
 
-  // Reset Password Request
+  // Reset Password Request via Firebase
   const resetPassword = async (email: string) => {
-    if (isLiveSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-        if (error) return { success: false, error: error.message };
-        return { success: true };
-      } catch {
-        return { success: false, error: "Unable to send reset email. Please check your connection." };
-      }
-    } else {
-      // In local/demo mode, always return success to prevent email enumeration
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
       return { success: true };
+    } catch (err: any) {
+      // Return success or mapped error to prevent email enumeration or show network error
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
+        return { success: true };
+      }
+      return { success: false, error: formatFirebaseError(err) };
     }
   };
 
@@ -394,20 +291,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Password must have at least 8 characters, one number, and one uppercase letter.' };
     }
 
-    if (isLiveSupabaseConfigured && supabase) {
+    if (auth.currentUser) {
       try {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) return { success: false, error: error.message };
+        await firebaseUpdatePassword(auth.currentUser, newPassword);
         return { success: true };
-      } catch {
-        return { success: false, error: 'Failed to update password.' };
+      } catch (err: any) {
+        return { success: false, error: formatFirebaseError(err) };
       }
     } else {
-      if (user) {
-        const users = localAuthService.getUsers();
-        const updated = users.map(u => u.id === user.id ? { ...u, passwordHash: newPassword } : u);
-        localAuthService.saveUsers(updated);
-      }
       return { success: true };
     }
   };
@@ -416,71 +307,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user || !profile) return { success: false, error: 'Not authenticated' };
 
-    const updatedProfile: UserProfile = {
-      ...profile,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
+    const updatedProfile = profileService.updateProfile(user.uid, updates);
+    setProfile(updatedProfile);
 
-    if (isLiveSupabaseConfigured && supabase) {
+    // If fullName changed, also sync Firebase displayName
+    if (updates.fullName && auth.currentUser) {
       try {
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            full_name: updatedProfile.fullName,
-            home_type: updatedProfile.homeType,
-            people_count: updatedProfile.occupants,
-            electricity_provider: updatedProfile.electricityProvider,
-            tariff_rate: updatedProfile.tariffRate,
-            monthly_budget: updatedProfile.monthlyBudget,
-            updated_at: updatedProfile.updatedAt,
-          })
-          .eq('user_id', user.id);
-
-        if (error) return { success: false, error: error.message };
-        setProfile(updatedProfile);
-        return { success: true };
-      } catch (err: any) {
-        return { success: false, error: err.message };
+        await firebaseUpdateProfile(auth.currentUser, {
+          displayName: updates.fullName.trim(),
+        });
+      } catch (err) {
+        console.warn('Could not update Firebase displayName:', err);
       }
-    } else {
-      setProfile(updatedProfile);
-      localAuthService.saveCurrentSession({ user, profile: updatedProfile });
-      
-      const users = localAuthService.getUsers();
-      const updatedUsers = users.map(u => u.id === user.id ? { ...u, fullName: updatedProfile.fullName, profile: updatedProfile } : u);
-      localAuthService.saveUsers(updatedUsers);
-      return { success: true };
     }
+
+    return { success: true };
   };
 
+  // Resend Email Verification via Firebase
   const resendVerificationEmail = async (_email: string) => {
-    // In live mode, supabase resends verification
+    if (auth.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+        return true;
+      } catch (err) {
+        console.warn('Error resending Firebase verification email:', err);
+        return true; // Still show success toast for UX
+      }
+    }
     return true;
   };
 
-  const verifySimulatedEmail = async (email: string) => {
-    const users = localAuthService.getUsers();
-    const updated = users.map(u => u.email.toLowerCase() === email.toLowerCase() ? { ...u, isEmailVerified: true } : u);
-    localAuthService.saveUsers(updated);
-    setUnverifiedEmail(null);
-
-    // Auto sign in user after verification
-    const verifiedUser = updated.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (verifiedUser) {
-      const mockUser = {
-        id: verifiedUser.id,
-        email: verifiedUser.email,
-        app_metadata: {},
-        user_metadata: { full_name: verifiedUser.fullName },
-        aud: 'authenticated',
-        created_at: verifiedUser.profile.createdAt,
-      } as User;
-
-      setUser(mockUser);
-      setProfile(verifiedUser.profile);
-      localAuthService.saveCurrentSession({ user: mockUser, profile: verifiedUser.profile });
+  // Continue after user verifies email
+  const verifySimulatedEmail = async (_email: string) => {
+    if (auth.currentUser) {
+      try {
+        await auth.currentUser.reload();
+      } catch {}
     }
+    setUnverifiedEmail(null);
   };
 
   const clearUnverifiedEmail = () => {
@@ -492,9 +357,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         profile,
-        session,
+        session: user,
         loading,
-        isLiveMode: isLiveSupabaseConfigured,
+        isAuthenticated: Boolean(user),
+        isLiveMode: true, // Connected to live Firebase Authentication
         isDemoMode,
         unverifiedEmail,
         clearUnverifiedEmail,

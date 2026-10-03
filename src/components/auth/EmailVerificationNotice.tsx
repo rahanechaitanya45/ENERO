@@ -46,8 +46,8 @@ export const EmailVerificationNotice: React.FC<EmailVerificationNoticeProps> = (
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
             We've sent a verification link to <strong className="text-slate-900 font-mono">{email}</strong>.
           </p>
-          <p className="text-xs text-slate-500">
-            Please click the confirmation link in your inbox to activate your ENERO account.
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            Please verify your email address before continuing.
           </p>
         </div>
 

@@ -48,7 +48,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     await resetPassword(email.trim());
     setLoading(false);
 
-    setMessage("If an account exists for this email, you'll receive instructions to reset your password.");
+    setMessage("Password reset instructions have been sent to your email.");
     setStep('sent');
   };
 

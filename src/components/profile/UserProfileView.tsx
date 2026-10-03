@@ -178,9 +178,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
           </div>
 
           <div className="flex flex-col items-start sm:items-end text-xs text-slate-400">
-            <span className="font-mono text-[11px]">User ID: {user?.id?.substring(0, 14)}...</span>
-            <span className="text-[11px] mt-0.5">
-              Security: {isLiveMode ? 'Supabase PostgreSQL RLS' : 'Isolated User Store'}
+            <span className="font-mono text-[11px]">Firebase UID: {user?.uid ? `${user.uid.substring(0, 16)}...` : 'demo-user-vedant'}</span>
+            <span className="text-[11px] mt-0.5 text-cyan-600 font-medium">
+              Firebase Auth · enero-9837b
             </span>
           </div>
         </div>
@@ -328,7 +328,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {/* Subscription & Billing Section */}
       {(() => {
         const isPremium = subscriptionService.isPremium(subscription);
-        const payments = subscriptionService.getPaymentHistory(user?.id);
+        const payments = subscriptionService.getPaymentHistory(user?.uid || (user as any)?.id);
 
         return (
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
