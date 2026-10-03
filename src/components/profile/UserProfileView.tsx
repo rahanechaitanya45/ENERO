@@ -329,6 +329,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {(() => {
         const isPremium = subscriptionService.isPremium(subscription);
         const payments = subscriptionService.getPaymentHistory(user?.uid || (user as any)?.id);
+        const pendingPayment = subscriptionService.getPendingUpiPayment(user?.uid || (user as any)?.id);
+        const allPendingPayments = subscriptionService.getAllPayments().filter((p) => p.status === 'pending');
 
         return (
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
@@ -339,9 +341,13 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     Subscription & Billing
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isPremium ? 'bg-cyan-100 text-cyan-900 border border-cyan-300' : 'bg-slate-100 text-slate-700'
+                    isPremium 
+                      ? 'bg-cyan-100 text-cyan-900 border border-cyan-300' 
+                      : pendingPayment
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-slate-100 text-slate-700'
                   }`}>
-                    {isPremium ? 'PREMIUM ACTIVE ⚡' : 'FREE BASIC PLAN'}
+                    {isPremium ? 'PREMIUM ACTIVE ⚡' : pendingPayment ? 'PAYMENT PENDING ⏳' : 'FREE BASIC PLAN'}
                   </span>
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">
@@ -368,11 +374,39 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-sky-300 hover:from-cyan-300 hover:to-sky-200 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
-                    <span>Upgrade to Premium (₹599/mo)</span>
+                    <span>{pendingPayment ? 'View Pending Payment' : 'Upgrade to Premium (₹599/mo)'}</span>
                   </button>
                 )}
               </div>
             </div>
+
+            {/* PENDING PAYMENT CALLOUT BANNER (Section 8, 9) */}
+            {pendingPayment && (
+              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-amber-950 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  <Clock className="w-4 h-4 text-amber-700 animate-pulse" />
+                  <span>Payment Verification Pending</span>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  “Your payment information has been submitted and is waiting for verification.”
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-[11px] pt-1 text-amber-800 font-medium">
+                  <span>UTR Reference: <strong className="font-mono">{pendingPayment.utr}</strong></span>
+                  <span>·</span>
+                  <span>Amount: <strong className="font-mono">₹{pendingPayment.amount}</strong></span>
+                  <span>·</span>
+                  <span>Method: <strong>UPI QR</strong></span>
+                  <span>·</span>
+                  <button
+                    type="button"
+                    onClick={onOpenUpgradeModal}
+                    className="text-cyan-800 underline hover:text-cyan-950 font-bold cursor-pointer"
+                  >
+                    View Status / Verify
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Plan Info Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -384,7 +418,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   {isPremium ? '₹599' : '₹0'} <span className="text-xs font-normal text-slate-500 font-sans">/month</span>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  {isPremium ? 'Billed monthly via Razorpay gateway' : '100% free basic estimation tier'}
+                  {isPremium ? 'Active ENERO Premium membership' : '100% free basic estimation tier'}
                 </p>
               </div>
 
@@ -426,7 +460,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
               {payments.length === 0 ? (
                 <div className="p-4 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-500">
-                  No payment transactions yet. When you upgrade to ENERO Premium (₹599/month), official payment receipts will appear here.
+                  No payment transactions yet. When you submit a UPI QR payment (₹599/month), official payment receipts will appear here.
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -435,34 +469,111 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                       <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-left">
                         <th className="py-2.5 px-4">Date</th>
                         <th className="py-2.5 px-4">Plan / Description</th>
-                        <th className="py-2.5 px-4">Order ID</th>
+                        <th className="py-2.5 px-4">UTR / Order ID</th>
                         <th className="py-2.5 px-4">Method</th>
                         <th className="py-2.5 px-4 text-right">Amount</th>
                         <th className="py-2.5 px-4 text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {payments.map((p) => (
-                        <tr key={p.id} className="text-slate-700 hover:bg-slate-50/50">
-                          <td className="py-2.5 px-4 font-medium">{p.date}</td>
-                          <td className="py-2.5 px-4 font-semibold text-slate-900">{p.plan}</td>
-                          <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{p.orderId}</td>
-                          <td className="py-2.5 px-4 text-slate-500">{p.paymentMethod}</td>
-                          <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                            ₹{p.amount.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-4 text-center">
-                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {p.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {payments.map((p) => {
+                        const statusLower = (p.status || '').toLowerCase();
+                        const isApprv = statusLower === 'approved' || statusLower === 'successful';
+                        const isPend = statusLower === 'pending';
+                        const isRej = statusLower === 'rejected' || statusLower === 'failed';
+
+                        return (
+                          <tr key={p.id} className="text-slate-700 hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 font-medium">{p.date}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-900">{p.plan}</td>
+                            <td className="py-2.5 px-4 font-mono text-[11px] text-slate-600">
+                              {p.utr ? `UTR: ${p.utr}` : p.orderId}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-500">
+                              {p.paymentMethod === 'UPI_QR' ? 'UPI QR' : p.paymentMethod}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              ₹{p.amount.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-center">
+                              {isPend && (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                  PENDING
+                                </span>
+                              )}
+                              {isApprv && (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
+                                  APPROVED ⚡
+                                </span>
+                              )}
+                              {isRej && (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  REJECTED
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
+
+            {/* Admin Audit & Verification Console (Sections 8, 9, 10) */}
+            {allPendingPayments.length > 0 && (
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                    <span>Admin Verification Console ({allPendingPayments.length} Pending)</span>
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {allPendingPayments.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          <span>User: {p.userEmail || p.userId}</span>
+                          <span className="font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                            UTR: {p.utr}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Amount: ₹{p.amount} · Submitted: {p.date} · Method: UPI_QR
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await subscriptionService.verifyPaymentByAdmin(p.id, 'approve');
+                            window.location.reload();
+                          }}
+                          className="px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Approve Payment ⚡
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await subscriptionService.verifyPaymentByAdmin(p.id, 'reject');
+                            window.location.reload();
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         );

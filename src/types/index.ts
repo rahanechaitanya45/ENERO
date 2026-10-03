@@ -102,7 +102,8 @@ export interface SimulationAdjustment {
 }
 
 export type SubscriptionPlan = 'free' | 'premium';
-export type SubscriptionStatus = 'active' | 'expired';
+export type SubscriptionStatus = 'active' | 'expired' | 'pending';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'Successful' | 'Failed';
 
 export interface UserSubscription {
   id: string;
@@ -117,18 +118,31 @@ export interface UserSubscription {
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
+  pendingPaymentId?: string;
 }
 
 export interface PaymentRecord {
-  id: string;
-  userId: string;
+  id: string; // payment_id
+  payment_id?: string;
+  userId: string; // user_id
+  user_id?: string;
+  userEmail?: string;
+  plan: 'premium' | string;
+  amount: number; // 599
+  currency: string; // 'INR'
+  paymentMethod: string; // 'UPI_QR' | string
+  payment_method?: string;
+  utr?: string;
+  screenshot_url?: string;
+  status: PaymentStatus;
   date: string;
-  plan: string;
-  amount: number;
-  currency: string;
-  status: 'Successful' | 'Failed';
-  orderId: string;
-  paymentMethod: string;
+  submitted_at?: string;
+  verified_at?: string;
+  verified_by?: string;
+  subscription_start?: string;
+  subscription_end?: string;
+  orderId?: string;
+  notes?: string;
 }
 
 export interface UserProfile {
