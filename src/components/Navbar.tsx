@@ -16,8 +16,10 @@ import {
   BarChart3,
   Sliders
 } from 'lucide-react';
-import { TariffConfig } from '../types';
+import { TariffConfig, UserSubscription } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { EneroLogo } from './EneroLogo';
+import { subscriptionService } from '../services/subscriptionService';
 
 interface NavbarProps {
   activeTab: string;
@@ -28,7 +30,9 @@ interface NavbarProps {
   onResetDemo: () => void;
   tariff: TariffConfig;
   totalApplianceCount: number;
+  subscription: UserSubscription;
 }
+
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
@@ -39,11 +43,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   onResetDemo,
   tariff,
   totalApplianceCount,
+  subscription,
 }) => {
   const { user, profile, signOut, isDemoMode } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isPremium = subscriptionService.isPremium(subscription);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -73,12 +80,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'simulator', label: 'Savings Simulator' },
     { id: 'recommendations', label: 'Insights' },
     { id: 'history', label: 'History' },
+    { id: 'pricing', label: 'Pricing' },
   ];
 
   const loggedOutLinks = [
     { id: 'landing', label: 'Home' },
     { id: 'how-it-works', label: 'How It Works' },
     { id: 'features', label: 'Features' },
+    { id: 'pricing', label: 'Pricing' },
     { id: 'about', label: 'About' },
   ];
 
@@ -102,23 +111,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Zone 1: Single text element Brand wordmark with icon */}
+          {/* Zone 1: Official ENERO Logo */}
           <button 
             onClick={() => setActiveTab(user ? 'dashboard' : 'landing')}
-            className="flex items-center gap-2 group text-left transition-opacity hover:opacity-90 cursor-pointer"
+            className="flex items-center group text-left transition-opacity hover:opacity-90 cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-600 to-sky-400 flex items-center justify-center text-white shadow-sm shadow-cyan-500/20">
-              <Zap className="w-5 h-5 fill-white text-white" />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
-                ENERO
-                <span className="text-[10px] uppercase font-semibold tracking-wider text-cyan-600 bg-cyan-50 border border-cyan-200/60 px-1.5 py-0.2 rounded">
-                  ESTIMATOR
-                </span>
-              </span>
-            </div>
+            <EneroLogo variant="horizontal" size="sm" />
           </button>
+
 
           {/* Zone 2: Clean text navigation links */}
           <nav className="hidden lg:flex items-center gap-1">
@@ -182,10 +182,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Dropdown Menu (Section 13) */}
                   {userDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                       <div className="px-3.5 py-2 border-b border-slate-100">
-                        <span className="text-[11px] text-slate-400 block">Signed in as</span>
-                        <span className="text-xs font-bold text-slate-900 truncate block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Account</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            isPremium ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {isPremium ? 'PREMIUM ⚡' : 'FREE BASIC'}
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 truncate block mt-1">
                           {user.email || displayName}
                         </span>
                       </div>
@@ -209,7 +216,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                       >
                         <User className="w-4 h-4 text-slate-400" />
-                        <span>Profile</span>
+                        <span>Profile & Subscription</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('pricing');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-cyan-600" />
+                        <span>{isPremium ? 'Plan & Benefits' : 'Upgrade to Premium (₹599)'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('financial-snapshot');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-600" />
+                        <span>Financial Snapshot (Part B)</span>
                       </button>
 
                       <button
@@ -238,6 +267,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     </div>
                   )}
+
                 </div>
               </>
             ) : (

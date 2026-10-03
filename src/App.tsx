@@ -30,12 +30,19 @@ import { UserOnboardingWizard } from './components/auth/UserOnboardingWizard';
 import { UserProfileView } from './components/profile/UserProfileView';
 import { ChangePasswordModal } from './components/profile/ChangePasswordModal';
 
+// Subscription, Pricing & Business Snapshot
+import { PricingSection } from './components/PricingSection';
+import { BusinessFinancialSnapshot } from './components/BusinessFinancialSnapshot';
+import { PaymentCheckoutModal } from './components/PaymentCheckoutModal';
+import { subscriptionService, SUBSCRIPTION_CONFIG } from './services/subscriptionService';
+
 import { 
   Appliance, 
   TariffConfig, 
   HomeProfile, 
   HistorySnapshot, 
-  HomeType 
+  HomeType,
+  UserSubscription
 } from './types';
 import { 
   calculateTotalSummary, 
@@ -75,6 +82,9 @@ function EneroAppContent() {
   const [history, setHistory] = useState<HistorySnapshot[]>(() => 
     storageService.getHistory(currentUserId)
   );
+  const [subscription, setSubscription] = useState<UserSubscription>(() => 
+    subscriptionService.getSubscription(currentUserId)
+  );
 
   // Modal Dialog States
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -84,6 +94,7 @@ function EneroAppContent() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   // Cross-view linking
   const [simulationTargetId, setSimulationTargetId] = useState<string | null>(null);
@@ -96,6 +107,7 @@ function EneroAppContent() {
       setTariff(storageService.getTariff(uId));
       setHomeProfile(storageService.getHomeProfile(uId));
       setHistory(storageService.getHistory(uId));
+      setSubscription(subscriptionService.getSubscription(uId));
     }
   }, [user?.id, authLoading]);
 
@@ -154,6 +166,11 @@ function EneroAppContent() {
   const handleOpenAddAppliance = () => {
     if (!user) {
       setActiveTab('login');
+      return;
+    }
+    const check = subscriptionService.canAddAppliance(appliances.length, subscription);
+    if (!check.allowed) {
+      setIsCheckoutModalOpen(true);
       return;
     }
     setEditingAppliance(null);
@@ -309,6 +326,7 @@ function EneroAppContent() {
           onResetDemo={handleResetDemoData}
           tariff={tariff}
           totalApplianceCount={appliances.length}
+          subscription={subscription}
         />
         <main className="flex-1 flex items-center justify-center p-4">
           <EmailVerificationNotice
@@ -337,6 +355,7 @@ function EneroAppContent() {
           onResetDemo={handleResetDemoData}
           tariff={tariff}
           totalApplianceCount={appliances.length}
+          subscription={subscription}
         />
         <main className="flex-1">
           <UserOnboardingWizard
@@ -367,6 +386,7 @@ function EneroAppContent() {
         onResetDemo={handleResetDemoData}
         tariff={tariff}
         totalApplianceCount={appliances.length}
+        subscription={subscription}
       />
 
       {/* Content View Router */}
@@ -387,6 +407,21 @@ function EneroAppContent() {
                 setActiveTab('dashboard');
               } else {
                 setActiveTab('login');
+              }
+            }}
+            onSelectPlan={(plan) => {
+              if (plan === 'premium') {
+                if (!user) {
+                  setActiveTab('signup');
+                } else {
+                  setIsCheckoutModalOpen(true);
+                }
+              } else {
+                if (user) {
+                  setActiveTab('dashboard');
+                } else {
+                  setActiveTab('signup');
+                }
               }
             }}
             summary={summary}
@@ -422,6 +457,32 @@ function EneroAppContent() {
           />
         )}
 
+        {/* PUBLIC ROUTE: Transparent Pricing & Business Model */}
+        {activeTab === 'pricing' && (
+          <PricingSection
+            subscription={subscription}
+            onSelectPlan={(plan) => {
+              if (plan === 'premium') {
+                if (!user) {
+                  setActiveTab('signup');
+                } else {
+                  setIsCheckoutModalOpen(true);
+                }
+              } else {
+                setActiveTab(user ? 'dashboard' : 'landing');
+              }
+            }}
+            onNavigateToDashboard={() => setActiveTab(user ? 'dashboard' : 'landing')}
+          />
+        )}
+
+        {/* PUBLIC/INTERNAL ROUTE: Part B Financial Snapshot */}
+        {activeTab === 'financial-snapshot' && (
+          <BusinessFinancialSnapshot
+            onBack={() => setActiveTab(user ? 'dashboard' : 'landing')}
+          />
+        )}
+
         {/* PROTECTED ROUTE: Dashboard 🔐 */}
         {activeTab === 'dashboard' && (
           <EnergyDashboard
@@ -429,6 +490,8 @@ function EneroAppContent() {
             rankedAppliances={rankedAppliances}
             tariff={tariff}
             homeProfile={homeProfile}
+            subscription={subscription}
+            onOpenUpgradeModal={() => setIsCheckoutModalOpen(true)}
             onNavigateTab={setActiveTab}
             onOpenTariffModal={() => setIsTariffModalOpen(true)}
             onAddAppliance={handleOpenAddAppliance}
@@ -441,6 +504,8 @@ function EneroAppContent() {
           <ApplianceList
             appliances={rankedAppliances}
             tariff={tariff}
+            subscription={subscription}
+            onOpenUpgradeModal={() => setIsCheckoutModalOpen(true)}
             onAddAppliance={handleOpenAddAppliance}
             onEditAppliance={handleEditAppliance}
             onDeleteAppliance={handleDeleteAppliance}
@@ -499,9 +564,12 @@ function EneroAppContent() {
         {activeTab === 'profile' && (
           <UserProfileView
             tariff={tariff}
+            subscription={subscription}
             onOpenChangePassword={() => setIsChangePasswordOpen(true)}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
             onClearUserData={handleClearUserData}
+            onOpenUpgradeModal={() => setIsCheckoutModalOpen(true)}
+            onOpenFinancialSnapshot={() => setActiveTab('financial-snapshot')}
           />
         )}
 
@@ -552,6 +620,17 @@ function EneroAppContent() {
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}
         onClose={() => setIsChangePasswordOpen(false)}
+      />
+
+      <PaymentCheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        userId={currentUserId}
+        userEmail={user?.email || 'user@enero.app'}
+        onPaymentSuccess={(newSub) => {
+          setSubscription(newSub);
+          setActiveTab('dashboard');
+        }}
       />
 
       {/* Footer */}

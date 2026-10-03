@@ -25,14 +25,17 @@ import {
   ResponsiveContainer, 
   Legend 
 } from 'recharts';
-import { BillSummary, ApplianceWithCalculations, TariffConfig, HomeProfile } from '../types';
+import { BillSummary, ApplianceWithCalculations, TariffConfig, HomeProfile, UserSubscription } from '../types';
 import { CATEGORY_COLORS } from '../data/presetAppliances';
+import { subscriptionService } from '../services/subscriptionService';
 
 interface EnergyDashboardProps {
   summary: BillSummary;
   rankedAppliances: ApplianceWithCalculations[];
   tariff: TariffConfig;
   homeProfile: HomeProfile;
+  subscription?: UserSubscription;
+  onOpenUpgradeModal?: () => void;
   onNavigateTab: (tab: string) => void;
   onOpenTariffModal: () => void;
   onAddAppliance?: () => void;
@@ -56,12 +59,14 @@ export const EnergyDashboard: React.FC<EnergyDashboardProps> = ({
   rankedAppliances,
   tariff,
   homeProfile,
+  subscription,
+  onOpenUpgradeModal,
   onNavigateTab,
   onOpenTariffModal,
   onAddAppliance,
   onLoadDemo,
 }) => {
-
+  const isPremium = subscriptionService.isPremium(subscription);
   const [viewMode, setViewMode] = useState<'monthly' | 'daily'>('monthly');
 
   // Prepare chart data for top 5 appliances + "Others"
@@ -167,6 +172,60 @@ export const EnergyDashboard: React.FC<EnergyDashboardProps> = ({
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Report</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Subscription Status Pill / Upgrade Bar */}
+      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+        isPremium 
+          ? 'bg-gradient-to-r from-slate-900 to-slate-950 text-white border-cyan-500/30 shadow-sm'
+          : 'bg-white border-slate-200 text-slate-700 shadow-2xs'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+            isPremium ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-100 text-slate-700'
+          }`}>
+            <Zap className={`w-4 h-4 ${isPremium ? 'fill-cyan-400' : ''}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">
+                {isPremium ? 'ENERO Premium Active ⚡' : 'Free Basic Plan'}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                isPremium ? 'bg-cyan-400 text-slate-950' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {isPremium ? 'UNLIMITED INVENTORY' : `${rankedAppliances.length}/5 APPLIANCES`}
+              </span>
+            </div>
+            <p className={`text-[11px] ${isPremium ? 'text-slate-400' : 'text-slate-500'}`}>
+              {isPremium
+                ? 'Unlimited appliance tracking, Gemini AI audits, and What-If simulation enabled.'
+                : 'Free basic electricity estimation. Upgrade to Premium for ₹599/month for AI audits & unlimited equipment.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!isPremium && onOpenUpgradeModal && (
+            <button
+              type="button"
+              onClick={onOpenUpgradeModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-sky-300 hover:from-cyan-300 hover:to-sky-200 rounded-xl transition-all shadow-xs cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+              <span>Upgrade to Premium (₹599)</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onNavigateTab('pricing')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors cursor-pointer ${
+              isPremium ? 'text-cyan-400 hover:text-cyan-300 bg-slate-800' : 'text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200'
+            }`}
+          >
+            {isPremium ? 'Plan Benefits' : 'View Plans'}
           </button>
         </div>
       </div>

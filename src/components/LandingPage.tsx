@@ -14,13 +14,15 @@ import {
   BarChart3,
   Flame,
   Snowflake,
-  Fan
+  Fan,
+  Check
 } from 'lucide-react';
 import { BillSummary, TariffConfig } from '../types';
 
 interface LandingPageProps {
   onStartWizard: () => void;
   onExploreDashboard: () => void;
+  onSelectPlan?: (plan: 'free' | 'premium') => void;
   summary: BillSummary;
   tariff: TariffConfig;
 }
@@ -28,6 +30,7 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({
   onStartWizard,
   onExploreDashboard,
+  onSelectPlan,
   summary,
   tariff,
 }) => {
@@ -367,6 +370,133 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
+        </div>
+      </section>
+
+      {/* Transparent Pricing Section */}
+      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-800 text-xs font-bold tracking-wide uppercase">
+            <Zap className="w-3.5 h-3.5 text-cyan-600 fill-cyan-600" />
+            <span>Pricing Plans</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+            Transparent, Accessible Pricing
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Monitor essential appliances for free, or upgrade to ENERO Premium for unlimited appliances, Gemini AI smart audits, and What-If simulations.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch max-w-4xl mx-auto">
+          {/* FREE PLAN */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between space-y-6 shadow-xs hover:border-slate-300 transition-all">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+                  Basic Monitoring
+                </span>
+                <h3 className="text-2xl font-bold text-slate-900">FREE</h3>
+                <p className="text-xs text-slate-500">
+                  Ideal for students, small apartments, and essential household devices.
+                </p>
+              </div>
+
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black font-mono text-slate-900">₹0</span>
+                <span className="text-sm font-semibold text-slate-500">/month</span>
+              </div>
+
+              <div className="space-y-2.5 pt-4 border-t border-slate-100 text-xs text-slate-700">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Personal secure account & saved setup</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Appliance electricity calculator & bill estimate</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 font-semibold" />
+                  <span><strong>Up to 5 appliances</strong> monitored</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Standard rule-based energy insights</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectPlan ? onSelectPlan('free') : onStartWizard()}
+              className="w-full py-3 px-4 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer text-center block"
+            >
+              START FOR FREE
+            </button>
+          </div>
+
+          {/* PREMIUM PLAN */}
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 text-white rounded-3xl border border-cyan-500/40 p-8 flex flex-col justify-between space-y-6 shadow-xl shadow-cyan-950/20 relative overflow-hidden">
+            <div className="absolute top-4 right-4">
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider bg-cyan-400 text-slate-950 px-3 py-1 rounded-full shadow-sm">
+                <Sparkles className="w-3 h-3 fill-slate-950" />
+                <span>MOST POPULAR</span>
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 block">
+                  Advanced Energy Management
+                </span>
+                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span>ENERO PREMIUM</span>
+                  <span className="text-cyan-400">⚡</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Full control with AI audits, What-If simulator, and unlimited inventory.
+                </p>
+              </div>
+
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black font-mono text-white">₹599</span>
+                <span className="text-sm font-semibold text-slate-400">/month</span>
+              </div>
+
+              <div className="space-y-2.5 pt-4 border-t border-slate-800 text-xs text-slate-300">
+                <div className="flex items-center gap-2 text-white font-medium">
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span><strong>Unlimited appliances</strong> inventory</span>
+                </div>
+                <div className="flex items-center gap-2 text-white font-medium">
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span><strong>AI Energy Insights</strong> (Gemini smart audits)</span>
+                </div>
+                <div className="flex items-center gap-2 text-white font-medium">
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span><strong>Interactive Savings Simulator</strong> (What-If lab)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Unlimited calculation history snapshots</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Target budget tracking & alert triggers</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectPlan ? onSelectPlan('premium') : onStartWizard()}
+              className="w-full py-3.5 px-4 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-sky-300 hover:from-cyan-300 hover:to-sky-200 rounded-xl transition-all shadow-md shadow-cyan-500/25 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>GET PREMIUM — ₹599/MONTH ⚡</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </div>
         </div>
       </section>
 

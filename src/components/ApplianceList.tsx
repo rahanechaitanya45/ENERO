@@ -17,12 +17,16 @@ import {
   SlidersHorizontal,
   ChevronDown
 } from 'lucide-react';
-import { ApplianceWithCalculations, ApplianceCategory, TariffConfig, Appliance } from '../types';
+import { ApplianceWithCalculations, ApplianceCategory, TariffConfig, Appliance, UserSubscription } from '../types';
 import { CATEGORY_COLORS } from '../data/presetAppliances';
+import { Sparkles, ArrowRight } from 'lucide-react';
+import { subscriptionService, SUBSCRIPTION_CONFIG } from '../services/subscriptionService';
 
 interface ApplianceListProps {
   appliances: ApplianceWithCalculations[];
   tariff: TariffConfig;
+  subscription?: UserSubscription;
+  onOpenUpgradeModal?: () => void;
   onAddAppliance: () => void;
   onEditAppliance: (appliance: Appliance) => void;
   onDeleteAppliance: (id: string) => void;
@@ -33,6 +37,8 @@ interface ApplianceListProps {
 export const ApplianceList: React.FC<ApplianceListProps> = ({
   appliances,
   tariff,
+  subscription,
+  onOpenUpgradeModal,
   onAddAppliance,
   onEditAppliance,
   onDeleteAppliance,
@@ -42,6 +48,9 @@ export const ApplianceList: React.FC<ApplianceListProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'kwh_desc' | 'kwh_asc' | 'name' | 'watts'>('kwh_desc');
+
+  const isPremium = subscriptionService.isPremium(subscription);
+  const quota = subscriptionService.canAddAppliance(appliances.length, subscription);
 
   const categories: { id: string; label: string }[] = [
     { id: 'all', label: 'All Appliances' },
@@ -109,6 +118,21 @@ export const ApplianceList: React.FC<ApplianceListProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Plan Quota Pill */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Plan:</span>
+            {isPremium ? (
+              <span className="font-bold text-cyan-700 flex items-center gap-1">
+                <span>Premium ⚡</span>
+                <span className="text-slate-400 font-normal">(Unlimited)</span>
+              </span>
+            ) : (
+              <span className="font-semibold text-slate-700">
+                Free Basic ({appliances.length}/{SUBSCRIPTION_CONFIG.FREE_MAX_APPLIANCES})
+              </span>
+            )}
+          </div>
+
           <button
             onClick={onAddAppliance}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
@@ -118,6 +142,35 @@ export const ApplianceList: React.FC<ApplianceListProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Free Plan Cap Warning Banner if at limit */}
+      {!isPremium && appliances.length >= SUBSCRIPTION_CONFIG.FREE_MAX_APPLIANCES && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-200/60 text-amber-800 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-950">
+                Free Plan Limit Reached (5 of 5 Appliances Monitored)
+              </h4>
+              <p className="text-[11px] text-amber-800">
+                You've reached the free tier limit. Upgrade to ENERO Premium for ₹599/month to track unlimited appliances and run AI audits.
+              </p>
+            </div>
+          </div>
+
+          {onOpenUpgradeModal && (
+            <button
+              onClick={onOpenUpgradeModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+            >
+              <span>Get Unlimited — ₹599/mo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-3">

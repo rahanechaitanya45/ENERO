@@ -66,6 +66,16 @@ export const Footer: React.FC<FooterProps> = ({
                   Usage History
                 </button>
               </li>
+              <li>
+                <button onClick={() => onNavigateTab('pricing')} className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors cursor-pointer">
+                  Plans & Pricing (₹599/mo)
+                </button>
+              </li>
+              <li>
+                <button onClick={() => onNavigateTab('financial-snapshot')} className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer">
+                  Financial Snapshot (Part B)
+                </button>
+              </li>
             </ul>
           </div>
 

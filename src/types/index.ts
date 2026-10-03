@@ -100,3 +100,34 @@ export interface SimulationAdjustment {
   newHoursPerDay: number;
   newDaysPerMonth: number;
 }
+
+export type SubscriptionPlan = 'free' | 'premium';
+export type SubscriptionStatus = 'active' | 'expired';
+
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  amount: number; // 599 for premium, 0 for free
+  currency: string; // 'INR'
+  paymentId?: string;
+  orderId?: string;
+  startedAt: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  userId: string;
+  date: string;
+  plan: string;
+  amount: number;
+  currency: string;
+  status: 'Successful' | 'Failed';
+  orderId: string;
+  paymentMethod: string;
+}
+
